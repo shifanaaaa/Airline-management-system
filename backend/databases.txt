@@ -1,0 +1,68 @@
+CREATE TABLE Customer (
+    Custid INT PRIMARY KEY AUTO_INCREMENT,  
+    First_Name VARCHAR(30) NOT NULL,
+    Last_name VARCHAR(30),
+    Nationality VARCHAR(10),
+    Residence VARCHAR(12),
+    Tel_No VARCHAR(15),
+    Password VARCHAR(50) NOT NULL,
+    Email_Address VARCHAR(40),
+    Other_info VARCHAR(50)
+);
+
+ Journey Table
+CREATE TABLE Journey (
+    Journ_Id INT PRIMARY KEY AUTO_INCREMENT,
+    Source VARCHAR(20) NOT NULL,
+    Destination VARCHAR(20) NOT NULL,
+    Cost DECIMAL(10, 2),  
+    Route VARCHAR(100)
+);
+
+-- 3. Schedule Table
+CREATE TABLE Schedule (
+    Sche_Id INT PRIMARY KEY AUTO_INCREMENT, 
+    Journ_Id INT NOT NULL,
+    Ddate DATE, 
+    Deptime TIME, 
+    Arritime TIME,
+    Delay_Minutes INT DEFAULT 0,
+    Delay_Reason VARCHAR(50),
+    FOREIGN KEY (Journ_Id) REFERENCES Journey(Journ_Id)
+);
+
+-- 4. Ticket Table
+CREATE TABLE Ticket (
+    Ticket_Id INT PRIMARY KEY AUTO_INCREMENT, 
+    Ticket_code VARCHAR(20) UNIQUE,
+    Custid INT NOT NULL,  
+    Sche_Id INT NOT NULL, 
+    Journ_Id INT NOT NULL,
+    Fair DECIMAL(10, 2),
+    Class VARCHAR(20),
+    Status VARCHAR(20),
+    FOREIGN KEY (Custid) REFERENCES Customer(Custid),
+    FOREIGN KEY (Sche_Id) REFERENCES Schedule(Sche_Id),
+    FOREIGN KEY (Journ_Id) REFERENCES Journey(Journ_Id)
+);
+
+-- 5. Flight Table
+
+CREATE TABLE Flight (
+    Book_no INT PRIMARY KEY AUTO_INCREMENT, 
+    Custid INT NOT NULL, 
+    Sche_Id INT NOT NULL, 
+    Journ_Id INT NOT NULL,
+    FOREIGN KEY (Custid) REFERENCES Customer(Custid),
+    FOREIGN KEY (Sche_Id) REFERENCES Schedule(Sche_Id),
+    FOREIGN KEY (Journ_Id) REFERENCES Journey(Journ_Id)
+);
+-- 6. Admin Table
+CREATE TABLE Admin (
+    Admin_Id INT PRIMARY KEY AUTO_INCREMENT,
+    Username VARCHAR(30) NOT NULL UNIQUE,
+    Password VARCHAR(50) NOT NULL,
+    Role VARCHAR(20) DEFAULT 'Admin',
+    Email VARCHAR(40),
+    Phone_No VARCHAR(15)
+);
