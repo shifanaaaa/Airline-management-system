@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Dashboard – Bermuda</title>
+<style>
+    * { margin:0; padding:0; box-sizing:border-box; font-family:'Poppins',sans-serif; }
+
+    body { 
+        background: linear-gradient(135deg, #a1c4fd, #c2e9fb); 
+        min-height:100vh; 
+        display:flex; 
+        justify-content:center; 
+        align-items:flex-start; 
+        padding: 50px 20px;
+    }
+
+    .dashboard-container {
+        background: #ffffffcc; /* subtle transparency */
+        padding: 40px 30px;
+        border-radius: 20px;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        width: 100%;
+        max-width: 700px;
+        text-align: center;
+    }
+
+    .dashboard-container h2 {
+        color: #1e90ff;
+        margin-bottom: 35px;
+        font-size: 2.2rem;
+        letter-spacing: 1px;
+    }
+
+    .stats {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 40px;
+        flex-wrap: wrap;
+    }
+
+    .stat {
+        background: #1e90ff;
+        color: #fff;
+        padding: 25px 20px;
+        margin: 10px;
+        border-radius: 15px;
+        flex: 1 1 30%;
+        min-width: 150px;
+        font-size: 1.4rem;
+        font-weight: 700;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .stat:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(30,144,255,0.3);
+    }
+
+    .stat span {
+        display: block;
+        margin-top: 10px;
+        font-size: 2rem;
+        font-weight: 800;
+    }
+
+    .buttons {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 20px;
+    }
+
+    .buttons a {
+        text-decoration: none;
+        padding: 15px 30px;
+        border-radius: 12px;
+        background: #4d92d6;
+        color: #fff;
+        font-size: 1.1rem;
+        font-weight: 600;
+        box-shadow: 0 5px 15px rgba(30,144,255,0.3);
+        transition: all 0.3s ease;
+    }
+
+    .buttons a:hover {
+        background: #297ed4;
+        transform: translateY(-3px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+    }
+
+</style>
+</head>
+<body>
+
+<div class="dashboard-container">
+    <h2>Welcome, {{ session.admin_username }}</h2>
+
+    <div class="stats">
+        <div class="stat">Flights<span>{{ total_flights }}</span></div>
+        <div class="stat">Customers<span>{{ total_customers }}</span></div>
+        <div class="stat">Tickets<span>{{ total_tickets }}</span></div>
+    </div>
+
+    <div class="buttons">
+        <a href="/flights">Manage Flights</a>
+        <a href="/customers">View Customers</a>
+        <a href="/admin_tickets">View Tickets</a>
+        <a href="/logout">Logout</a>
+    </div>
+</div>
+
+</body>
+</html>

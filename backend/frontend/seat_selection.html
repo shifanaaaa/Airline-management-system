@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Select Seats – Bermuda</title>
+<style>
+    * { margin:0; padding:0; box-sizing:border-box; font-family:'Poppins',sans-serif; }
+    body {
+        background: linear-gradient(to top, #a1c4fd, #c2e9fb);
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+
+    h2 {
+        color: #1e90ff;
+        font-size: 2rem;
+        margin-bottom: 20px;
+    }
+
+    .flight-info {
+        background: #fff;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        width: 100%;
+        max-width: 500px;
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
+    .flight-info p {
+        font-size: 1rem;
+        margin: 5px 0;
+    }
+
+    .seat-map {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 10px;
+        background: #fff;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        max-width: 400px;
+    }
+
+    .seat {
+        width: 50px;
+        height: 50px;
+        background-color: #e0e0e0;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+    }
+
+    .seat:hover {
+        transform: scale(1.05);
+    }
+
+    .seat.selected {
+        background-color: #1e90ff;
+        color: white;
+    }
+
+    .seat.booked {
+        background-color: #ff4d4d;
+        color: white;
+        cursor: not-allowed;
+    }
+
+    .legend {
+        display: flex;
+        justify-content: center;
+        margin-top: 20px;
+        gap: 20px;
+    }
+
+    .legend div {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .legend span {
+        width: 20px;
+        height: 20px;
+        border-radius: 4px;
+    }
+
+    .available-color { background: #e0e0e0; }
+    .selected-color { background: #1e90ff; }
+    .booked-color { background: #ff4d4d; }
+
+    button {
+        margin-top: 30px;
+        padding: 12px 25px;
+        border: none;
+        border-radius: 8px;
+        background: #1e90ff;
+        color: #fff;
+        font-size: 1.1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    button:hover {
+        background: #0066cc;
+    }
+</style>
+</head>
+<body>
+
+<h2>Select Your Seat</h2>
+
+<div class="flight-info">
+    <p><strong>Flight:</strong> {{ flight.flight_name }}</p>
+    <p><strong>From:</strong> {{ flight.source }}</p>
+    <p><strong>To:</strong> {{ flight.destination }}</p>
+    <p><strong>Fare:</strong> ₹{{ flight.fare }}</p>
+</div>
+
+<form method="POST" action="/select_seat/{{ flight.flight_id }}">
+    <div class="seat-map">
+        {% for seat in seats %}
+        <div class="seat {% if seat.is_booked %}booked{% endif %}"
+             data-seat="{{ seat.seat_no }}"
+             onclick="selectSeat(this)">
+            {{ seat.seat_no }}
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="legend">
+        <div><span class="available-color"></span>Available</div>
+        <div><span class="selected-color"></span>Selected</div>
+        <div><span class="booked-color"></span>Booked</div>
+    </div>
+
+    <input type="hidden" name="selected_seat" id="selectedSeatInput">
+    <button type="submit">Confirm Booking</button>
+</form>
+
+<script>
+    function selectSeat(element) {
+        if (element.classList.contains('booked')) return;
+
+        document.querySelectorAll('.seat').forEach(seat => seat.classList.remove('selected'));
+        element.classList.add('selected');
+        document.getElementById('selectedSeatInput').value = element.dataset.seat;
+    }
+</script>
+
+</body>
+</html>

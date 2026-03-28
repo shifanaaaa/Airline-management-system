@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Update Flight – Bermuda</title>
+<style>
+    * { margin:0; padding:0; box-sizing:border-box; font-family:'Poppins',sans-serif; }
+    body { background: linear-gradient(to top, #a1c4fd, #c2e9fb); min-height:100vh; display:flex; justify-content:center; align-items:center; }
+
+    .form-container {
+        background: #fff;
+        padding: 40px 30px;
+        border-radius: 12px;
+        box-shadow: 0 15px 25px rgba(0,0,0,0.1);
+        width: 100%;
+        max-width: 500px;
+        text-align: center;
+    }
+
+    .form-container h2 {
+        color: #1e90ff;
+        margin-bottom: 25px;
+        font-size: 2rem;
+    }
+
+    .form-container input,
+    .form-container select {
+        width: 100%;
+        padding: 12px 15px;
+        margin: 10px 0;
+        border-radius: 8px;
+        border: 1px solid #ccc;
+        font-size: 1rem;
+    }
+
+    .form-container button {
+        width: 100%;
+        padding: 12px;
+        margin-top: 15px;
+        border: none;
+        border-radius: 8px;
+        background: #1e90ff;
+        color: #fff;
+        font-size: 1.1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .form-container button:hover {
+        background: #0066cc;
+    }
+
+    .back-link {
+        display: inline-block;
+        margin-top: 15px;
+        text-decoration: none;
+        color: #1e90ff;
+        font-weight: 500;
+    }
+
+    .back-link:hover {
+        text-decoration: underline;
+    }
+
+    .error-msg {
+        color: red;
+        font-size: 0.9rem;
+        margin-bottom: 10px;
+    }
+</style>
+</head>
+<body>
+
+<div class="form-container">
+    <h2>Update Flight</h2>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <div class="error-msg">{{ messages[0] }}</div>
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST" action="/update_flight/{{ flight.flight_id }}">
+        <input type="text" name="flight_name" placeholder="Flight Name" value="{{ flight.flight_name }}" required>
+        <input type="text" name="source" placeholder="Source" value="{{ flight.source }}" required>
+        <input type="text" name="destination" placeholder="Destination" value="{{ flight.destination }}" required>
+
+        <label>Departure Time:</label>
+        <input type="datetime-local" name="departure_time" value="{{ flight.departure_time|datetime_local }}" required>
+        <label>Arrival Time:</label>
+        <input type="datetime-local" name="arrival_time" value="{{ flight.arrival_time|datetime_local }}" required>
+
+        <input type="number" name="total_seats" placeholder="Total Seats" min="1" value="{{ flight.total_seats }}" required>
+        <input type="number" step="0.01" name="fare" placeholder="Fare" min="0" value="{{ flight.fare }}" required>
+
+        <label>Status:</label>
+        <select name="status">
+            <option value="Scheduled" {% if flight.status == 'Scheduled' %}selected{% endif %}>Scheduled</option>
+            <option value="Cancelled" {% if flight.status == 'Cancelled' %}selected{% endif %}>Cancelled</option>
+            <option value="Completed" {% if flight.status == 'Completed' %}selected{% endif %}>Completed</option>
+        </select>
+
+        <button type="submit">Update Flight</button>
+    </form>
+
+    <a href="/flights" class="back-link">← Back to Flights</a>
+</div>
+
+</body>
+</html>
