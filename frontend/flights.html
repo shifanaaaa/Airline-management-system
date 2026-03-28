@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manage Flights – Bermuda</title>
+<style>
+    * { margin:0; padding:0; box-sizing:border-box; font-family:'Poppins',sans-serif; }
+
+    body {
+        background: linear-gradient(135deg, #a1c4fd, #c2e9fb);
+        min-height:100vh;
+        padding: 50px 20px;
+    }
+
+    .container {
+        max-width: 1300px;
+        margin: 0 auto;
+        background: #ffffffcc;
+        border-radius: 20px;
+        padding: 30px;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+    }
+
+    h2 {
+        color: #1e90ff;
+        margin-bottom: 30px;
+        font-size: 2rem;
+        text-align: center;
+    }
+
+    .add-btn {
+        display: inline-block;
+        margin-bottom: 20px;
+        padding: 12px 25px;
+        background: #1e90ff;
+        color: #fff;
+        font-weight: 600;
+        border-radius: 12px;
+        text-decoration: none;
+        transition: all 0.3s ease;
+    }
+
+    .add-btn:hover {
+        background: #0066cc;
+        transform: translateY(-2px);
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+    }
+
+    th, td {
+        padding: 15px;
+        text-align: center;
+        border-bottom: 1px solid #ccc;
+        font-size: 1rem;
+    }
+
+    th {
+        background: #1e90ff;
+        color: #fff;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    td button {
+        padding: 8px 15px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+
+    .edit-btn {
+        background: #28a745;
+        color: #fff;
+    }
+
+    .edit-btn:hover {
+        background: #218838;
+        transform: translateY(-2px);
+    }
+
+    .delete-btn {
+        background: #dc3545;
+        color: #fff;
+    }
+
+    .delete-btn:hover {
+        background: #c82333;
+        transform: translateY(-2px);
+    }
+
+    @media (max-width: 768px) {
+        th, td {
+            padding: 10px;
+            font-size: 0.9rem;
+        }
+
+        .add-btn {
+            width: 100%;
+            text-align: center;
+        }
+    }
+</style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Manage Flights</h2>
+    <a href="/add_flight" class="add-btn">+ Add Flight</a>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Flight Name</th>
+                <th>Source</th>
+                <th>Destination</th>
+                <th>Departure</th>
+                <th>Arrival</th>
+                <th>Total Seats</th>
+                <th>Available Seats</th>
+                <th>Fare</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for flight in flights %}
+            <tr>
+                <td>{{ flight.flight_name }}</td>
+                <td>{{ flight.source }}</td>
+                <td>{{ flight.destination }}</td>
+                <td>{{ flight.departure_time }}</td>
+                <td>{{ flight.arrival_time }}</td>
+                <td>{{ flight.total_seats }}</td>
+                <td>{{ flight.available_seats }}</td>
+                <td>{{ flight.fare }}</td>
+                <td>{{ flight.status }}</td>
+                <td>
+                    <a href="/update_flight/{{ flight.flight_id }}"><button class="edit-btn">Edit</button></a>
+                    <form action="/delete_flight/{{ flight.flight_id }}" method="POST" style="display:inline;">
+                        <button type="submit" class="delete-btn">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="10">No flights available.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <a href="/admin_dashboard" class="add-btn" style="background:#6c757d;">Back to Dashboard</a>
+</div>
+
+</body>
+</html>

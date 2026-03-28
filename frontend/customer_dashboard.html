@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Customer Dashboard – Bermuda</title>
+<style>
+    * { margin:0; padding:0; box-sizing:border-box; font-family:'Poppins',sans-serif; }
+    body { background: linear-gradient(to top, #a1c4fd, #c2e9fb); min-height:100vh; display:flex; justify-content:center; align-items:center; padding:20px; }
+
+    .dashboard-container {
+        background: #fff;
+        padding: 40px 30px;
+        border-radius: 12px;
+        box-shadow: 0 15px 25px rgba(0,0,0,0.1);
+        width: 100%;
+        max-width: 700px;
+        text-align: center;
+    }
+
+    .dashboard-container h2 {
+        color: #1e90ff;
+        margin-bottom: 20px;
+        font-size: 2rem;
+    }
+
+    .stats {
+        display: flex;
+        justify-content: space-around;
+        flex-wrap: wrap;
+        margin-bottom: 30px;
+        gap: 15px;
+    }
+
+    .stat {
+        background: #f0f8ff;
+        padding: 20px;
+        border-radius: 10px;
+        width: 150px;
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: #1e90ff;
+        box-shadow: 0 5px 10px rgba(0,0,0,0.05);
+        transition: transform 0.2s;
+    }
+
+    .stat:hover {
+        transform: translateY(-5px);
+    }
+
+    .buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        align-items: center;
+    }
+
+    .buttons a {
+        text-decoration: none;
+        padding: 12px 25px;
+        border-radius: 8px;
+        background: #1e90ff;
+        color: #fff;
+        font-size: 1.1rem;
+        font-weight: 600;
+        width: 80%;
+        max-width: 300px;
+        transition: all 0.3s ease;
+        text-align: center;
+    }
+
+    .buttons a:hover {
+        background: #0066cc;
+    }
+
+</style>
+</head>
+<body>
+
+<div class="dashboard-container">
+    <h2>Welcome, {{ user_name }}</h2>
+
+    <div class="stats">
+        <div class="stat">
+            Total Tickets<br>
+            {{ total_tickets }}
+        </div>
+        <div class="stat">
+            Upcoming Flights<br>
+            {{ upcoming_flights }}
+        </div>
+    </div>
+
+    <div class="buttons">
+        <a href="/search_flights">Search Flights</a>
+        <a href="/my_tickets">My Tickets</a>
+        <a href="/logout">Logout</a>
+    </div>
+</div>
+
+</body>
+</html>

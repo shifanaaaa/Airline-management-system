@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Search Flights – Bermuda</title>
+<style>
+    * { margin:0; padding:0; box-sizing:border-box; font-family:'Poppins',sans-serif; }
+    body { background: linear-gradient(to top, #a1c4fd, #c2e9fb); min-height:100vh; display:flex; justify-content:center; align-items:center; padding:20px; }
+
+    .search-container {
+        background: #fff;
+        padding: 40px 30px;
+        border-radius: 12px;
+        box-shadow: 0 15px 25px rgba(0,0,0,0.1);
+        width: 100%;
+        max-width: 500px;
+        text-align: center;
+    }
+
+    .search-container h2 {
+        color: #1e90ff;
+        margin-bottom: 25px;
+        font-size: 2rem;
+    }
+
+    .search-container form {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .search-container input, .search-container select {
+        width: 100%;
+        padding: 12px 15px;
+        border-radius: 8px;
+        border: 1px solid #ccc;
+        font-size: 1rem;
+    }
+
+    .search-container button {
+        padding: 12px;
+        border: none;
+        border-radius: 8px;
+        background: #1e90ff;
+        color: #fff;
+        font-size: 1.1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .search-container button:hover {
+        background: #0066cc;
+    }
+
+</style>
+</head>
+<body>
+
+<div class="search-container">
+    <h2>Search Flights</h2>
+    <form method="POST" action="/search_flights">
+        <input type="text" name="source" placeholder="Source City" required>
+        <input type="text" name="destination" placeholder="Destination City" required>
+        <input type="date" name="date" required>
+        <button type="submit">Search</button>
+    </form>
+</div>
+
+</body>
+</html>
