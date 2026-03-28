@@ -1,471 +1,444 @@
-from flask import Flask,request,render_template,redirect,session,jsonify
-from flask_cors import CORS
+from flask import Flask, request, render_template, redirect, session, flash, url_for
 import mysql.connector
 import hashlib
 import os
-from dotenv import load_dotenv 
+import time
+import random
+from datetime import datetime
 
-load_dotenv()
-app=Flask(__name__)
-CORS(app) #Enabling the cors
 
-app.secret_key=os.getenv("SECRET_KEY")
-db=mysql.connector.connect(
-    host=os.getenv("DB_HOST"),
-    user=os.getenv("DB_USER"),
-    password=os.getenv("DB_PASSWORD"),
-    database=os.getenv("DB_NAME")
+app = Flask(__name__)
+app.secret_key = "secrets"
+
+db = mysql.connector.connect(
+    host='localhost',
+    user='root',
+    password='shifana123',
+    # password=os.getenv("DB_PASSWORD"),
+    database='mydbs'
 )
-cursor=db.cursor(dictionary=True)
+cursor = db.cursor(dictionary=True)
 
-#Home
+# ---------- Helpers ----------
+def hash_pw(password: str) -> str:
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def generate_ticket_code() -> str:
+    return f"TKT{int(time.time())}{random.randint(100,999)}"
+
+def require_admin():
+    if not session.get('admin_logged_in'):
+        flash("Admin login required")
+        return False
+    return True
+
+def require_user():
+    if 'cust_id' not in session:
+        flash("Please login first")
+        return False
+    return True
+@app.template_filter('datetime_local')
+def datetime_local(value):
+    """
+    Converts a datetime object to a string usable in <input type="datetime-local">
+    Format: YYYY-MM-DDTHH:MM
+    """
+    if isinstance(value, datetime):
+        return value.strftime('%Y-%m-%dT%H:%M')
+    return value  # fallback
+#home
 @app.route('/')
 def home():
-    return jsonify({"message":"Welcome to the flight booking API"}),200
+    return render_template('index.html')
 
-#user login
-@app.route('/user_login',methods=['POST'])
-def user_login():
-    data = request.get_json()
-    if not data:
-        return jsonify({"message": "Invalid JSON data"}), 400
-        
-    username = data.get('username')
-    password = data.get('password')
-    
-    hashed_pw = hashlib.sha256(password.encode()).hexdigest()
-    cursor.execute("select id from users where username = %s and password = %s", (username, hashed_pw))
-    user = cursor.fetchone()
+#admin
+@app.route('/admin_login_page')
+def admin_login_page():
+    return render_template('admin_login.html')
 
-    if user:
-        session['user_id'] = user['id']
-        return jsonify({"message": "Login successful", "user_id": user['id']}), 200
-    else:
-        return jsonify({"message": "Invalid username or password. Try again!"}), 401
-    
-
-@app.route('/user_dashboard')
-def user_dashboard():
-    if 'user_id' in session:
-        return jsonify({"message": "Access granted"}), 200
-    else:
-        return jsonify({"message": "Unauthorized access."}), 401
-    
-@app.route('/admins', methods=['GET'])
-def show_admins_api():
-    cursor.execute("SELECT Admin_Id, Username, Email, Phone_No FROM Admin")
-    admins = cursor.fetchall()
-    admin_list = [
-        {"id": a['Admin_Id'], "username": a['Username'], "email": a['Email'], "phoneNo": a['Phone_No']}
-        for a in admins
-    ]
-    return jsonify(admin_list)
-@app.route('/admins', methods=['POST'])
-def add_admin_api():
-    data = request.get_json()
-    if not data:
-        return jsonify({"message": "Invalid JSON data"}), 400        
-    username = data.get('username')
-    password = data.get('password')
-    email = data.get('email', '')
-    phone = data.get('phoneNo', '')
-    
-    if not username or not password:
-        return jsonify({"message": "Error: Username and Password are required."}), 400
-
-    try:
-        hashed_pass = hashlib.sha256(password.encode()).hexdigest()
-        cursor.execute("""
-            INSERT INTO Admin (Username, Password, Email, Phone_No)
-            VALUES (%s, %s, %s, %s)
-        """, (username, hashed_pass, email, phone))
-        db.commit()
-        return jsonify({"message": "Admin added successfully", "id": cursor.lastrowid}), 201
-    except mysql.connector.Error as err:
-        db.rollback()
-        return jsonify({"message": f"Database Error: {err}"}), 500
-#Admin login and logout
 @app.route('/admin_login', methods=['POST'])
-def admin_login_api():
-    data = request.get_json()
-    if not data:
-        return jsonify({"message": "Invalid JSON data"}), 400
-
-    username = data.get('username')
-    password = data.get('password')
-    
-    hashed_pass = hashlib.sha256(password.encode()).hexdigest()
-
-    cursor.execute("SELECT * FROM Admin WHERE Username=%s AND Password=%s", 
-                   (username, hashed_pass))
+def admin_login():
+    username = request.form['username']
+    password = request.form['password']
+    cursor.execute("SELECT * FROM Admin WHERE username = %s AND password = %s", (username, password))
     admin = cursor.fetchone()
     if admin:
-        session['admin'] = admin['Admin_Id']
-        return jsonify({"message": "Admin login successful", "admin_id": admin['Admin_Id']}), 200
+        session['admin_logged_in'] = True
+        session['admin_username'] = username
+        return redirect('/admin_dashboard')
     else:
-        return jsonify({"message": "Invalid username or password"}), 401
+        flash("Invalid admin credentials")
+        return redirect('/admin_login_page')
 
-@app.route('/admin_logout')
-def admin_logout():
-    session.pop('admin', None)
-    return jsonify({"message": "Logged out successfully"}), 200
+@app.route('/admin_dashboard')
+def admin_dashboard():
+    if not require_admin():
+        return redirect('/admin_login_page')
+    cursor.execute("SELECT COUNT(*) AS total_flights FROM Flight")
+    flights_count = cursor.fetchone()['total_flights']
+    cursor.execute("SELECT COUNT(*) AS total_customers FROM Customer")
+    customers_count = cursor.fetchone()['total_customers']
+    cursor.execute("SELECT COUNT(*) AS total_tickets FROM Ticket")
+    tickets_count = cursor.fetchone()['total_tickets']
+    return render_template('admin_dashboard.html',
+                           total_flights=flights_count,
+                           total_customers=customers_count,
+                           total_tickets=tickets_count)
 
 
-#Customer
-@app.route('/customers',methods=['GET'])
-def show_customers_api():
-    cursor.execute("select * from Customer")
-    customers=cursor.fetchall()
-    customer_list=[
-        {
-            "id": c['Custid'],
-            "firstName": c['First_Name'],
-            "lastName": c['Last_name'],
-            "email": c['Email_Address'],
-            "tel": c['Tel_No'],
-            "nationality": c['Nationality'],
-            "residence": c['Residence'],
-        }
-        for c in customers
-    ]
-    return jsonify(customer_list),200
 
-@app.route('/customers',methods=['POST'])
-def add_customer_api():
-    data=request.get_json()
-    if not data:
-        return jsonify({'message':'Invalid JSON data'}),400
-    if request.methods=='POST':
-        fname = data.get('firstName')
-        lname = data.get('lastName')
-        nationality = data.get('nationality', '')
-        residence = data.get('residence', '')
-        tel = data.get('tel','')
-        password = data.get('password')
-        email = data.get('email', '')
-        other = data.get('otherInfo', '')
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect('/')
 
-        if not fname or not lname or not password:
-            return jsonify({'message':"Error: First Name, Last Name. and password are required."}),400
-        
+#customer
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        name = request.form['name']
+        email = request.form['email']
+        password = request.form['password']
+        phone = request.form.get('phone', '')
+        address = request.form.get('address', '')
         try:
-            hashed_pass=hashlib.sha256(password.encode()).hexdigest()
-
-            cursor.execute(""" INSERT INTO Customer(First_Name, Last_name, Nationality, Residence, Tel_No, Password, Email_Address, Other_info)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",(fname,lname,nationality,residence,tel,hashed_pass,email,other))
-            
+            cursor.execute("INSERT INTO Customer (name, email, password, phone, address) VALUES (%s,%s,%s,%s,%s)",
+                           (name, email, password, phone, address))
             db.commit()
-            return jsonify({"message":"Customer added successfully","custid":cursor.lastrowid}),201
+            flash("Registration successful. Please login.")
+            return redirect('/customer_login')
         except mysql.connector.Error as err:
-            db.rollback()
-            return jsonify({"message":f"database error: {err}"}),500
+            return f"Error: {err}"
+    return render_template('register.html')
 
-@app.route('/customers/<int:custid>', methods=['PUT'])
-def update_customer_api(custid):
-    data=request.get_json()
-    if not data:
-        return jsonify({'message':'Invalid JSON data'}),400
+@app.route('/customer_login', methods=['GET', 'POST'])
+def customer_login():
+    if request.method == 'POST':
+        email = request.form['email']
+        password = request.form['password']
+        cursor.execute("SELECT * FROM Customer WHERE email = %s AND password = %s", (email, password))
+        user = cursor.fetchone()
+        if user:
+            session['user_name'] = user['name']
+            session['cust_id'] = user['customer_id']
+            flash("Logged in")
+            return redirect('/customer_dashboard')
+        else:
+            flash("Invalid login credentials")
+            return redirect('/customer_login')
+    return render_template('customer_login.html')
+
+@app.route('/customer_dashboard')
+def customer_dashboard():
+    if not require_user():
+        return redirect('/customer_login')
     
-    fname = data.get('firstName')
-    lname = data.get('lastName')
-    fname = data.get('firstName')
-    nationality = data.get('nationality', '')
-    residence = data.get('residence', '')
-    tel = data.get('tel','')
-    email = data.get('email', '')
-    if not fname or not lname:
-        return jsonify({"message": "Error: First name and last name are required."}), 400
-
-    try:
-        cursor.execute("""
-            UPDATE Customer 
-            SET First_Name=%s, Last_name=%s, Email_Address=%s, Tel_No=%s, Nationality=%s, Residence=%s
-            WHERE Custid=%s
-        """, (fname, lname, email, tel, nationality, residence, custid))
-        db.commit()
-        return jsonify({"message": f"Customer {custid} updated successfully"}), 200
-        
-    except mysql.connector.Error as err:
-        db.rollback()
-        return jsonify({"message": f"Database Error: {err}"}), 500
+    cust_id = session['cust_id']
     
-@app.route('/customers/<int:custid>', methods=['DELETE'])
-def delete_customer_api(custid):
-    try:
-        cursor.execute("delete from Customer where Custid=%s", (custid,))
-        db.commit()
-        return jsonify({"message":f'Customer {custid} deleted successfully'}),200
-    except mysql.connector.Error as err:
-        db.rollback()
-        return jsonify({"message": f"Database Error: {err}"}), 500
-    
+    # Total tickets booked by the user
+    cursor.execute("SELECT COUNT(*) AS total FROM Ticket WHERE customer_id = %s", (cust_id,))
+    total_tickets = cursor.fetchone()['total']
 
+    # Upcoming flights (future departure) for this user
+    cursor.execute("""
+        SELECT COUNT(*) AS upcoming
+        FROM Ticket t
+        JOIN Flight f ON t.flight_id = f.flight_id
+        WHERE t.customer_id = %s AND f.departure_time > NOW() AND t.status = 'Booked'
+    """, (cust_id,))
+    upcoming_flights = cursor.fetchone()['upcoming']
 
-#Journey
-@app.route('/journeys',methods=['GET'])
-def show_jouneys():
-    cursor.execute("select * from Journey")
-    journeys=cursor.fetchall()
+    return render_template(
+        'customer_dashboard.html',
+        user_name=session.get('user_name'),
+        total_tickets=total_tickets,
+        upcoming_flights=upcoming_flights
+    )
 
-    journey_list=[
-        {
-            'id': j['Journ_Id'],
-            'sourse': j['Source'],
-            'destination':j['Destination'],
-            'cost':float(j['Cost']),
-            'route':j['Route']
-        }
-        for j in journeys
-    ]
-    return jsonify(journey_list),200
-
-@app.route('/journeys', methods=['POST'])
-def add_journey_api():
-    data = request.get_json()
-    if not data:
-            return jsonify({"message": "Invalid JSON data"}), 400
-    source =data.get('source')
-    dest = data.get('destination')
-    cost = data.get('cost', 0)
-    route = data.get('route', '')
-   
-    if not source or not dest:
-        return  jsonify({"message":"Error: Source and Destination are required"}),400
-    try:
-         cost=float(cost)
-    except ValueError:
-        return jsonify({"message":"Error: Cost must be a number" }),400 
-    try:
-
-        cursor.execute("""
-            INSERT INTO Journey (Source, Destination, Cost, Route)
-            VALUES (%s, %s, %s, %s)
-        """, (source, dest, cost, route))
-        db.commit()
-        return jsonify({"message": "Journey added successfully", "id": cursor.lastrowid}), 201
-    except mysql.connector.Error as err:
-        db.rollback()
-        return jsonify({"message": f"Database error: {err}"}), 500
-    
-@app.route('/journeys/<int:journey_id>', methods=['PUT'])
-def update_journey_api(journey_id):
-    data = request.get_json()
-    if not data:
-            return jsonify({"message": "Invalid JSON data"}), 400
-    source =data.get('source')
-    dest = data.get('destination')
-    cost = data.get('cost', 0)
-    route = data.get('route', '')
-    if not source or not dest:
-        return  jsonify({"message":"Error: Source and Destination are required"}),400
-    try:
-         cost=float(cost)
-    except ValueError:
-        return jsonify({"message":"Error: Cost must be a number" }),400    
-    try:
-        cursor.execute("""
-            UPDATE Journey SET Source=%s, Destination=%s, Cost=%s, Route=%s
-            WHERE Journ_Id=%s
-        """, (source, dest, cost, route, journey_id))
-        db.commit()
-        if cursor.rowcount == 0:
-            return jsonify({"message": f"Journey {journey_id} not found."}), 404
-        return jsonify({"message": f"Journey {journey_id} updated successfully"}), 200
-    except mysql.connector.Error as err:
-        db.rollback()
-        return jsonify({"message": f"Database Error: {err}"}), 500
-     
-@app.route('/journeys/<int:journey_id>', methods=['DELETE'])
-def delete_journey_api(journey_id):
-    try:
-        cursor.execute("DELETE FROM Journey WHERE Journ_Id=%s", (journey_id,))
-        db.commit()
-        if cursor.rowcount==0:
-            return jsonify({"message":f"Journey{journey_id} not found"}),404
-        return jsonify({"messaage":f"journey{journey_id} deleted successfully"}),200
-    except mysql.connector.Error as err:
-        db.rollback()
-        return jsonify({"message":f"Database Error:{err}"}),500 
-
-#schedule
-@app.route('/schedules',methods=['GET'])
-def show_schedules_api():
-    cursor.execute("select * from Schedule")
-    schedules = cursor.fetchall()
-    schedule_list = [
-        {
-            "id": s['Sche_Id'],
-            "journeyId": s['Journ_Id'],
-            "date": str(s['Ddate']),       
-            "depTime": str(s['Deptime']),  
-            "arrTime": str(s['Arritime']),
-            "delay": s['Delay_Minutes'],
-            "reason": s['Delay_Reason']
-        }
-        for s in schedules
-    ]
-    return jsonify(schedule_list), 200
-@app.route('/schedules', methods=['POST'])
-def add_schedule_api():
-    data = request.get_json()
-    if not data:
-            return jsonify({"message": "Invalid JSON data"}), 400
-    journ_id = data.get('journeyId')
-    ddate = data.get('date') #YYYY-MM-DD
-    deptime = data.get('depTime')#HH:MM:SS
-    arrtime = data.get('arrTime')
-    delay = data.get('delay', 0)
-    reason = data.get('reason', '')
-    if not journ_id or not ddate or not deptime:
-        return jsonify({"message": "Error: Journey ID, Date, and Departure Time are required"}), 400
-    
-    try:
-        journ_id = int(journ_id)
-        delay = int(delay)
-    except ValueError:
-        return jsonify({"message": "Error: Journey ID and Delay must be numbers"}), 400
-
-    try:    
-        cursor.execute("""
-            INSERT INTO Schedule (Journ_Id, Ddate, Deptime, Arritime, Delay_Minutes, Delay_Reason)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        """, (journ_id, ddate, deptime, arrtime, delay, reason))
-        db.commit()
-        return jsonify({"message": "Schedule added successfully", "id": cursor.lastrowid}), 201
-    except mysql.connector.Error as err:
-        db.rollback()
-        return jsonify({"message": f"Database Error: {err}"}), 500
-
-@app.route('/schedules/<int:schedule_id>', methods=['DELETE'])
-def delete_schedule_api(schedule_id):
-    try:
-        cursor.execute("DELETE FROM Schedule WHERE Sche_Id=%s", (schedule_id,))
-        db.commit()
-        if cursor.rowcount == 0:
-            return jsonify({"message": f"Schedule {schedule_id} not found."}), 404
-        return jsonify({"message": f"Schedule {schedule_id} deleted successfully"}), 200
-    except mysql.connector.Error as err:
-        db.rollback()
-        return jsonify({"message": f"Database Error: {err}"}), 500 
-#tickets
-@app.route('/tickets',methods=['GET'])
-def show_tickets_api():
-    cursor.execute("select * from Ticket")
-    tickets = cursor.fetchall()
-    ticket_list = [
-        {
-            "id": t['Ticket_Id'],
-            "code": t['Ticket_code'],
-            "custId": t['Custid'],
-            "scheduleId": t['Sche_Id'],
-            "journeyId": t['Journ_Id'],
-            "fair": float(t['Fair']), # Ensure fair is a number
-            "class": t['Class'],
-            "status": t['Status'],
-        }
-        for t in tickets
-    ]
-    return jsonify(ticket_list), 200
-
-@app.route('/tickets', methods=['POST'])
-def add_ticket():
-    data = request.get_json()
-    if not data:
-            return jsonify({"message": "Invalid JSON data"}), 400
-    ticket_code = data.get('code')
-    custid = data.get('custId')
-    sche_id = data.get('scheduleId')
-    journ_id = data.get('journeyId')
-    fair = data.get('fair', 0)
-    tclass = data.get('class', '')
-    status = data.get('status', 'Booked')
-
-    if not ticket_code or not custid  or not sche_id or not journ_id:
-        return jsonify({"message": "Error: Ticket code, Customer ID, Schedule ID, and Journey ID are required"}), 400
-    
-    try:
-        custid = int(custid)
-        sche_id = int(sche_id)
-        journ_id = int(journ_id)
-        fair = float(fair)
-    except ValueError:
-        return jsonify({"message": "Error: IDs must be integers and Fair must be a number."}), 400    
-
-    try:
-        cursor.execute("""
-            INSERT INTO Ticket (Ticket_code, Custid, Sche_Id, Journ_Id, Fair, Class, Status)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """, (ticket_code, custid, sche_id, journ_id, fair, tclass, status))
-        db.commit()
-        return jsonify({"message": "Ticket added successfully", "id": cursor.lastrowid}), 201
-    except mysql.connector.Error as err:
-        db.rollback()
-        return jsonify({"message": f"Database Error: {err}"}), 500
-
-
-@app.route('/tickets/<int:ticket_id>', methods=['DELETE'])
-def delete_ticket_api(ticket_id):
-    try:
-        cursor.execute("DELETE FROM Ticket WHERE Ticket_Id=%s", (ticket_id,))
-        db.commit()
-        if cursor.rowcount == 0:
-            return jsonify({"message": f"Ticket {ticket_id} not found."}), 404
-        return jsonify({"message": f"Ticket {ticket_id} deleted successfully"}), 200
-    except mysql.connector.Error as err:
-        db.rollback()
-        return jsonify({"message": f"Database Error: {err}"}), 500
 
 #flight
-@app.route('/flights',methods=['GET'])
-def show_flights_api():
-    cursor.execute("select * from Flight")
+@app.route('/flights')
+def show_flights():
+    cursor.execute("SELECT * FROM Flight ORDER BY departure_time ASC")
     flights = cursor.fetchall()
-    flight_list=[
-        {
-            "id": f['Book_no'],
-            "custId": f['Custid'],
-            "scheduleId": f['Sche_Id'],
-            "journeyId": f['Journ_Id']
-        }
-        for f in flights
-    ]
-    return jsonify(flight_list),200
-#add flight
-@app.route('/add_flight', methods=['POST'])
-def add_flight_api():
-    data = request.get_json()
-    if not data:
-            return jsonify({"message": "Invalid JSON data"}), 400
-    custid = data.get('custId')
-    sche_id = data.get('scheduleId')
-    journ_id = data.get('journeyId')
+    return render_template('flights.html', flights=flights)
+# flight
+# ... (other flight routes)
 
-    if not custid or not sche_id or not journ_id:
-        return jsonify({"message": "Error: Customer ID, Schedule ID, and Journey ID are required"}), 400
-        
+@app.route('/add_flight', methods=['GET', 'POST'])
+def add_flight():
+    if not require_admin():
+        return redirect('/admin_login_page')
+    if request.method == 'POST':
+        # ... (flight data extraction remains the same)
+        flight_name = request.form['flight_name']
+        source = request.form['source']
+        destination = request.form['destination']
+        departure_time = request.form['departure_time']
+        arrival_time = request.form['arrival_time']
+        total_seats = int(request.form['total_seats'])
+        fare = float(request.form['fare'])
+        try:
+            # 1. Insert Flight Record
+            cursor.execute("""
+                INSERT INTO Flight (flight_name, source, destination, departure_time, arrival_time, total_seats, available_seats, fare)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+            """, (flight_name, source, destination, departure_time, arrival_time, total_seats, total_seats, fare))
+            db.commit()
+            flight_id = cursor.lastrowid
+
+            # 2. SEAT GENERATION LOGIC (Corrected)
+            letters = ['A', 'B', 'C', 'D', 'E', 'F']
+            seats_to_insert = []
+            
+            # Determine the number of rows needed (rounded up)
+            num_rows = (total_seats + len(letters) - 1) // len(letters) # Equivalent to math.ceil(total_seats / 6)
+
+            for seat_index in range(total_seats):
+                # Calculate the row number (1-indexed)
+                row_num = (seat_index // len(letters)) + 1
+                # Calculate the column letter
+                letter = letters[seat_index % len(letters)]
+                
+                seat_no = f"{letter}{row_num}"
+                seats_to_insert.append((flight_id, seat_no))
+
+            # Batch insert seats
+            seat_insert_query = "INSERT INTO Seat (flight_id, seat_no) VALUES (%s, %s)"
+            cursor.executemany(seat_insert_query, seats_to_insert)
+            
+            db.commit()
+            flash("Flight added and seats generated")
+            return redirect('/flights')
+        except mysql.connector.Error as err:
+            # IMPORTANT: Rollback if seat insertion fails
+            db.rollback() 
+            return f"Error: {err}"
+    return render_template('add_flight.html')
+
+@app.route('/update_flight/<int:flight_id>', methods=['GET', 'POST'])
+def update_flight(flight_id):
+    if not require_admin():
+        return redirect('/admin_login_page')
+    cursor.execute("SELECT * FROM Flight WHERE flight_id = %s", (flight_id,))
+    flight = cursor.fetchone()
+    if not flight:
+        flash("Flight not found")
+        return redirect('/flights')
+    if request.method == 'POST':
+        flight_name = request.form['flight_name']
+        source = request.form['source']
+        destination = request.form['destination']
+        departure_time = request.form['departure_time']
+        arrival_time = request.form['arrival_time']
+        total_seats = int(request.form['total_seats'])
+        fare = float(request.form['fare'])
+        status = request.form.get('status', 'Scheduled')
+        try:
+            
+            cursor.execute("""
+                UPDATE Flight SET flight_name=%s, source=%s, destination=%s,
+                                  departure_time=%s, arrival_time=%s, total_seats=%s, fare=%s, status=%s
+                WHERE flight_id=%s
+            """, (flight_name, source, destination, departure_time, arrival_time, total_seats, fare, status, flight_id))
+            
+            cursor.execute("SELECT COUNT(*) AS booked FROM Ticket WHERE flight_id = %s AND status = 'Booked'", (flight_id,))
+            booked = cursor.fetchone()['booked']
+            available = max(0, total_seats - booked)
+            cursor.execute("UPDATE Flight SET available_seats = %s WHERE flight_id = %s", (available, flight_id))
+            db.commit()
+            flash("Flight updated")
+            return redirect('/flights')
+        except mysql.connector.Error as err:
+            return f"Error: {err}"
+    return render_template('update_flight.html', flight=flight)
+
+@app.route('/delete_flight/<int:flight_id>', methods=['POST'])
+def delete_flight(flight_id):
+    if not require_admin():
+        return redirect('/admin_login_page')
     try:
-        cursor.execute("""
-            INSERT INTO Flight (Custid, Sche_Id, Journ_Id)
-            VALUES (%s, %s, %s)
-        """, (custid, sche_id, journ_id))
+        
+        cursor.execute("DELETE FROM Seat WHERE flight_id = %s", (flight_id,))
+        cursor.execute("DELETE FROM Ticket WHERE flight_id = %s", (flight_id,))
+        cursor.execute("DELETE FROM Flight WHERE flight_id = %s", (flight_id,))
         db.commit()
-        return jsonify({"message": "Flight added successfully", "id": cursor.lastrowid}), 201
+        flash("Flight deleted")
+        return redirect('/flights')
     except mysql.connector.Error as err:
-        db.rollback()
-        return jsonify({"message": f"Database Error: {err}"}), 500
+        return f"Error: {err}"
+
+#search flight
+@app.route('/search_flights', methods=['GET', 'POST'])
+def search_flights():
+    if request.method == 'POST':
+        source = request.form.get('source')
+        destination = request.form.get('destination')
+        date = request.form.get('date')
+        query = """
+            SELECT * FROM Flight
+            WHERE source = %s AND destination = %s
+              AND DATE(departure_time) = %s
+              AND status = 'Scheduled' AND available_seats > 0
+            ORDER BY departure_time
+        """
+        cursor.execute(query, (source, destination, date))
+        flights = cursor.fetchall()
+        return render_template('search_results.html', flights=flights)
+    return render_template('search_flights.html')
+
+# ---------- FLIGHT SCHEDULE ----------
+@app.route('/flight_schedule')
+def flight_schedule():
+    cursor.execute("""
+        SELECT flight_id, flight_name, source, destination,
+               DATE(departure_time) AS date,
+               TIME(departure_time) AS dep_time,
+               TIME(arrival_time) AS arr_time,
+               status, available_seats, fare
+        FROM Flight
+        ORDER BY departure_time ASC
+    """)
+    schedule = cursor.fetchall()
+    return render_template('flight_schedule.html', schedule=schedule)
+
+#seat map and booking
+@app.route('/select_seat/<int:flight_id>', methods=['GET', 'POST'])
+def select_seat(flight_id):
     
-@app.route('/flights/<int:flight_id>', methods=['DELETE'])
-def delete_flight_api(flight_id):
-    book_no = flight_id 
+    cursor.execute("SELECT * FROM Flight WHERE flight_id = %s", (flight_id,))
+    flight = cursor.fetchone()
+    if not flight:
+        flash("Flight not found")
+        return redirect('/search_flights')
+
+    if request.method == 'POST':
+        if not require_user():
+            return redirect('/customer_login')
+        seat_no = request.form['selected_seat']
+        travel_class = request.form.get('class', 'Economy')
+        cust_id = session['cust_id']
+        cursor.execute("SELECT * FROM Seat WHERE flight_id = %s AND seat_no = %s FOR UPDATE", (flight_id, seat_no))
+        seat = cursor.fetchone()
+        if not seat:
+            flash("Selected seat not found")
+            return redirect(url_for('select_seat', flight_id=flight_id))
+        if seat['is_booked']:
+            flash("Seat already booked. Please choose another.")
+            return redirect(url_for('select_seat', flight_id=flight_id))
+        try:
+            cursor.execute("UPDATE Seat SET is_booked = TRUE WHERE seat_id = %s", (seat['seat_id'],))
+            # Create ticket
+            ticket_code = generate_ticket_code()
+            cursor.execute("""
+                INSERT INTO Ticket (ticket_code, customer_id, flight_id, seat_no, class, status)
+                VALUES (%s, %s, %s, %s, %s, 'Booked')
+            """, (ticket_code, cust_id, flight_id, seat_no, travel_class))
+            
+            cursor.execute("UPDATE Flight SET available_seats = available_seats - 1 WHERE flight_id = %s", (flight_id,))
+            db.commit()
+            flash("Booking successful. Ticket code: " + ticket_code)
+            return redirect('/my_tickets')
+        except mysql.connector.Error as err:
+            db.rollback()
+            return f"Error: {err}"
+
+    cursor.execute("SELECT seat_no, is_booked FROM Seat WHERE flight_id = %s ORDER BY seat_no", (flight_id,))
+    seats = cursor.fetchall()
+    return render_template('seat_selection.html', seats=seats, flight=flight)
+
+#ticket
+@app.route('/my_tickets')
+def my_tickets():
+    if not require_user():
+        return redirect('/customer_login')
+    cust_id = session['cust_id']
+    cursor.execute("""
+        SELECT t.ticket_id, t.ticket_code, t.flight_id, t.seat_no, t.class, t.booking_date, t.status,
+               f.flight_name, f.source, f.destination, f.departure_time, f.arrival_time, f.fare
+        FROM Ticket t
+        JOIN Flight f ON t.flight_id = f.flight_id
+        WHERE t.customer_id = %s
+        ORDER BY t.booking_date DESC
+    """, (cust_id,))
+    tickets = cursor.fetchall()
+    return render_template('tickets.html', tickets=tickets)
+
+@app.route('/cancel_ticket/<int:ticket_id>', methods=['POST'])
+def cancel_ticket(ticket_id):
+    if not require_user():
+        return redirect('/customer_login')
+    cust_id = session['cust_id']
+    cursor.execute("SELECT * FROM Ticket WHERE ticket_id = %s AND customer_id = %s", (ticket_id, cust_id))
+    ticket = cursor.fetchone()
+    if not ticket:
+        flash("Ticket not found or unauthorized")
+        return redirect('/my_tickets')
+    if ticket['status'] == 'Cancelled':
+        flash("Ticket already cancelled")
+        return redirect('/my_tickets')
     try:
-        cursor.execute("DELETE FROM Flight WHERE Book_no=%s", (book_no,))
-        db.commit()
-        if cursor.rowcount == 0:
-            return jsonify({"message": f"Flight with ID {book_no} not found"}), 404
+        cursor.execute("UPDATE Ticket SET status = 'Cancelled' WHERE ticket_id = %s", (ticket_id,))
+        cursor.execute("UPDATE Seat SET is_booked = FALSE WHERE flight_id = %s AND seat_no = %s",
+                       (ticket['flight_id'], ticket['seat_no']))
         
-        return jsonify({"message": f"Flight {book_no} deleted successfully"}), 200
+        cursor.execute("UPDATE Flight SET available_seats = available_seats + 1 WHERE flight_id = %s", (ticket['flight_id'],))
+        db.commit()
+        flash("Ticket cancelled")
     except mysql.connector.Error as err:
         db.rollback()
-        return jsonify({"message": f"Database Error: {err}"}), 500   
-if __name__=="__main__":
+        return f"Error: {err}"
+    return redirect('/my_tickets')
+
+# admin view
+@app.route('/admin_tickets')
+def admin_tickets():
+    if not require_admin():
+        return redirect('/admin_login_page')
+    cursor.execute("""
+        SELECT t.ticket_id, t.ticket_code, t.status, t.booking_date, t.seat_no, t.class,
+               c.name AS customer_name, f.flight_name, f.source, f.destination, f.departure_time
+        FROM Ticket t
+        JOIN Customer c ON t.customer_id = c.customer_id
+        JOIN Flight f ON t.flight_id = f.flight_id
+        ORDER BY t.booking_date DESC
+    """)
+    tickets = cursor.fetchall()
+    return render_template('admin_tickets.html', tickets=tickets)
+
+@app.route('/admin_cancel_ticket/<int:ticket_id>', methods=['POST'])
+def admin_cancel_ticket(ticket_id):
+    if not require_admin():
+        return redirect('/admin_login_page')
+    cursor.execute("SELECT * FROM Ticket WHERE ticket_id = %s", (ticket_id,))
+    ticket = cursor.fetchone()
+    if not ticket:
+        flash("Ticket not found")
+        return redirect('/admin_tickets')
+    if ticket['status'] == 'Cancelled':
+        flash("Ticket already cancelled")
+        return redirect('/admin_tickets')
+    try:
+        cursor.execute("UPDATE Ticket SET status = 'Cancelled' WHERE ticket_id = %s", (ticket_id,))
+        cursor.execute("UPDATE Seat SET is_booked = FALSE WHERE flight_id = %s AND seat_no = %s",
+                       (ticket['flight_id'], ticket['seat_no']))
+        cursor.execute("UPDATE Flight SET available_seats = available_seats + 1 WHERE flight_id = %s", (ticket['flight_id'],))
+        db.commit()
+        flash("Ticket cancelled by admin")
+    except mysql.connector.Error as err:
+        db.rollback()
+        return f"Error: {err}"
+    return redirect('/admin_tickets')
+
+#list customer
+@app.route('/customers')
+def show_customers():
+    if not require_admin():
+        return redirect('/admin_login_page')
+    cursor.execute("SELECT * FROM Customer")
+    customers = cursor.fetchall()
+    return render_template("customers.html", customers=customers)
+
+#run
+if __name__ == "__main__":
     app.run(debug=True)
