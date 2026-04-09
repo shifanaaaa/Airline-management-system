@@ -13,8 +13,7 @@ app.secret_key = "secrets"
 db = mysql.connector.connect(
     host='localhost',
     user='root',
-    password='shifana123',
-    # password=os.getenv("DB_PASSWORD"),
+    password=os.getenv("DB_PASSWORD"),
     database='mydbs'
 )
 cursor = db.cursor(dictionary=True)
